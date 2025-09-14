@@ -27,7 +27,7 @@ api_client = asana.ApiClient(configuration)
 projects_api_instance = asana.ProjectsApi(api_client)
 tasks_api_instance = asana.TasksApi(api_client)
 
-workspace_gid = os.getenv("ASANA_WORKPLACE_ID", "")
+workspace_gid = os.getenv("ASANA_WORKSPACE_ID", "")
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -256,7 +256,9 @@ def add_thought(thought):
         with st.chat_message("assistant"):
             st.markdown(thought)       
 
-def prompt_ai(nested_calls=0, invoked_tools=[]):
+def prompt_ai(nested_calls=0, invoked_tools=None):
+    if invoked_tools is None:
+        invoked_tools = []
     if nested_calls > 10:
         raise Exception("Failsafe - AI is failing too much!")
 
@@ -268,7 +270,7 @@ def prompt_ai(nested_calls=0, invoked_tools=[]):
         ai_response = asana_chatbot.invoke(st.session_state.messages)
     except Exception as e:
         print(e)
-        return prompt_ai(nested_calls + 1)
+        return prompt_ai(nested_calls + 1, invoked_tools)
     print(ai_response)
 
     # Second, see if the AI decided it needs to invoke a tool
