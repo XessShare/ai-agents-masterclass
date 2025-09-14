@@ -21,6 +21,12 @@ load_dotenv()
 webhook_url = os.getenv('WEBHOOK_URL')
 webhook_auth = os.getenv('WEBHOOK_AUTH')
 
+# Validate required environment variables
+if not webhook_url:
+    raise ValueError("WEBHOOK_URL environment variable is required but not set")
+if not webhook_auth:
+    raise ValueError("WEBHOOK_AUTH environment variable is required but not set")
+
 @st.cache_resource
 def get_session_id():
     return str(uuid.uuid4())

@@ -237,7 +237,7 @@ def decide_model_from_prompt(messages):
 
 def prompt_ai(messages, router_decided_model, nested_calls=0):
     if nested_calls > 5:
-        raise "AI is tool calling too much!"
+        raise Exception("AI is tool calling too much!")
 
     # First, prompt the AI with the latest user message
     tools = [tool for _, tool in available_functions.items()]

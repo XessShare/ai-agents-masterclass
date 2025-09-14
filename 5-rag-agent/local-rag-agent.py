@@ -38,22 +38,47 @@ def get_local_model():
 llm = get_local_model()
 
 def load_documents(directory):
-    # Load the PDF or txt documents from the directory
-    loader = DirectoryLoader(directory)
-    documents = loader.load()
+    # Load the PDF or txt documents from the directory with file type filtering
+    try:
+        loader = DirectoryLoader(
+            directory, 
+            glob="**/*.txt",  # Only load text files for better performance
+            show_progress=True
+        )
+        documents = loader.load()
+        
+        if not documents:
+            print(f"Warning: No documents found in {directory}")
+            return []
 
-    # Split the documents into chunks
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-    docs = text_splitter.split_documents(documents)
-
-    return docs
+        # Split the documents into chunks with overlap for better context preservation
+        text_splitter = CharacterTextSplitter(
+            chunk_size=1000, 
+            chunk_overlap=200,  # Add overlap to preserve context at boundaries
+            length_function=len,
+            separator="\n\n"  # Split on paragraph boundaries when possible
+        )
+        docs = text_splitter.split_documents(documents)
+        
+        print(f"Loaded {len(documents)} documents and created {len(docs)} chunks")
+        return docs
+        
+    except Exception as e:
+        print(f"Error loading documents from {directory}: {e}")
+        return []
 
 @st.cache_resource
 def get_chroma_instance():
     # Get the documents split into chunks
     docs = load_documents(rag_directory)
+    
+    if not docs:
+        print("No documents to process. Creating empty Chroma instance.")
+        # Create an empty Chroma instance with the same embedding function
+        embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+        return Chroma(embedding_function=embedding_function)
 
-    # create the open-sourc e embedding function
+    # create the open-source embedding function
     embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 
     # load it into Chroma
@@ -73,10 +98,27 @@ def query_documents(question):
     Returns:
         str: The list of texts (and their sources) that matched with the question the closest using RAG
     """
-    similar_docs = db.similarity_search(question, k=5)
-    docs_formatted = list(map(lambda doc: f"Source: {doc.metadata.get('source', 'NA')}\nContent: {doc.page_content}", similar_docs))
+    try:
+        # Check if database has any documents
+        collection_count = db._collection.count()
+        if collection_count == 0:
+            return ["No documents available in the knowledge base."]
+            
+        similar_docs = db.similarity_search(question, k=5)
+        
+        if not similar_docs:
+            return ["No relevant documents found for your question."]
+            
+        docs_formatted = list(map(
+            lambda doc: f"Source: {doc.metadata.get('source', 'NA')}\nContent: {doc.page_content}", 
+            similar_docs
+        ))
 
-    return docs_formatted   
+        return docs_formatted
+        
+    except Exception as e:
+        print(f"Error querying documents: {e}")
+        return [f"Error occurred while searching documents: {str(e)}"]   
 
 def prompt_ai(messages):
     # Fetch the relevant documents for the query
