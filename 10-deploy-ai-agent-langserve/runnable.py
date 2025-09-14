@@ -33,6 +33,20 @@ model_mapping = {
 available_functions = available_asana_functions
 tools = [tool for _, tool in available_functions.items()]
 
+# Define get_local_model function for local LLM support
+def get_local_model():
+    """
+    Returns a local LLM model instance for Llama models.
+    This function should be implemented based on your local model setup.
+    """
+    from langchain_huggingface import HuggingFaceEndpoint
+    return HuggingFaceEndpoint(
+        repo_id=model,
+        task="text-generation",
+        max_new_tokens=1024,
+        do_sample=False
+    )
+
 for key, chatbot_class in model_mapping.items():
     if key in model.lower():
         chatbot = chatbot_class(model=model) if key != "llama" else chatbot_class(llm=get_local_model())

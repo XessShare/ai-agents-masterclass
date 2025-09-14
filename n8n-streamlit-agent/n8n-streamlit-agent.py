@@ -3,13 +3,25 @@ import requests
 import uuid
 from supabase import create_client, Client
 
-# Supabase setup
-SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL_HERE"
-SUPABASE_KEY = "YOUR_SUPABASE_ANONYMOUS_API_KEY_HERE"
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Supabase setup - Load from environment variables for security
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
+# Validate required environment variables
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Missing required environment variables. Please set SUPABASE_URL and SUPABASE_KEY.")
+    st.stop()
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Webhook URL (replace with your n8n webhook URL)
-WEBHOOK_URL = "YOUR_N8N_WEBHOOK_URL_HERE"
+WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
 
 def login(email: str, password: str):
     try:
@@ -99,20 +111,28 @@ def main():
             # Get the access token from the session
             access_token = st.session_state.auth.session.access_token
             
+            # Validate webhook URL is set
+            if not WEBHOOK_URL:
+                st.error("Missing N8N_WEBHOOK_URL environment variable.")
+                return
+            
             # Send request to webhook
             headers = {
                 "Authorization": f"Bearer {access_token}"
             }
             with st.spinner("AI is thinking..."):
-                response = requests.post(WEBHOOK_URL, json=payload, headers=headers)
-            
-            if response.status_code == 200:
-                ai_message = response.json().get("output", "Sorry, I couldn't generate a response.")
-                st.session_state.messages.append({"role": "assistant", "content": ai_message})
-                with st.chat_message("assistant"):
-                    st.markdown(ai_message)
-            else:
-                st.error(f"Error: {response.status_code} - {response.text}")
+                try:
+                    response = requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=30)
+                    
+                    if response.status_code == 200:
+                        ai_message = response.json().get("output", "Sorry, I couldn't generate a response.")
+                        st.session_state.messages.append({"role": "assistant", "content": ai_message})
+                        with st.chat_message("assistant"):
+                            st.markdown(ai_message)
+                    else:
+                        st.error(f"Error: {response.status_code} - {response.text}")
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Network error: {str(e)}")
 
 if __name__ == "__main__":
     main()
