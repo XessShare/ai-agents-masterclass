@@ -113,7 +113,9 @@ Any message that starts with "Thought:" is you thinking to yourself. This isn't 
 Don't repeat an action. If a thought tells you that you already took an action for a user, don't do it again.
 """       
 
-def prompt_ai(messages, nested_calls=0, invoked_tools=[]):
+def prompt_ai(messages, nested_calls=0, invoked_tools=None):
+    if invoked_tools is None:
+        invoked_tools = []
     if nested_calls > 3:
         raise Exception("Failsafe - AI is failing too much!")
 
@@ -123,8 +125,9 @@ def prompt_ai(messages, nested_calls=0, invoked_tools=[]):
 
     try:
         ai_response = asana_chatbot.invoke(messages)
-    except:
-        return prompt_ai(messages, nested_calls + 1)
+    except Exception as e:
+        print(e)
+        return prompt_ai(messages, nested_calls + 1, invoked_tools)
     print(ai_response)
 
     # Second, see if the AI decided it needs to invoke a tool
