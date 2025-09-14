@@ -12,7 +12,10 @@ client = OpenAI()
 model = os.getenv('OPENAI_MODEL', 'gpt-4o')
 
 configuration = asana.Configuration()
-configuration.access_token = os.getenv('ASANA_ACCESS_TOKEN', '')
+asana_token = os.getenv('ASANA_ACCESS_TOKEN', '')
+if not asana_token:
+    raise ValueError("ASANA_ACCESS_TOKEN environment variable is required but not set")
+configuration.access_token = asana_token
 api_client = asana.ApiClient(configuration)
 
 tasks_api_instance = asana.TasksApi(api_client)

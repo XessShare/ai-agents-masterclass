@@ -248,7 +248,7 @@ available_functions = {
 
 def prompt_ai(messages, nested_calls=0):
     if nested_calls > 5:
-        raise "AI is tool calling too much!"
+        raise Exception("AI is tool calling too much!")
 
     # First, prompt the AI with the latest user message
     tools = [tool for _, tool in available_functions.items()]
