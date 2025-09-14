@@ -7,10 +7,11 @@ from langchain_core.tools import tool
 
 load_dotenv()
 
-N8N_BEARER_TOKEN = os.environ["N8N_BEARER_TOKEN"]
-SUMMARIZE_SLACK_CONVERSATION_WEBHOOK = os.environ["SUMMARIZE_SLACK_CONVERSATION_WEBHOOK"]
-SEND_SLACK_MESSAGE_WEBHOOK = os.environ["SEND_SLACK_MESSAGE_WEBHOOK"]
-UPLOAD_GOOGLE_DOC_WEBHOOK = os.environ["UPLOAD_GOOGLE_DOC_WEBHOOK"]
+# Use get to avoid KeyError at import; validate at call time
+N8N_BEARER_TOKEN = os.environ.get("N8N_BEARER_TOKEN", "")
+SUMMARIZE_SLACK_CONVERSATION_WEBHOOK = os.environ.get("SUMMARIZE_SLACK_CONVERSATION_WEBHOOK", "")
+SEND_SLACK_MESSAGE_WEBHOOK = os.environ.get("SEND_SLACK_MESSAGE_WEBHOOK", "")
+UPLOAD_GOOGLE_DOC_WEBHOOK = os.environ.get("UPLOAD_GOOGLE_DOC_WEBHOOK", "")
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -31,23 +32,34 @@ def invoke_n8n_webhook(method, url, function_name, payload=None):
     Returns:
         str: The API response in JSON format or an error message
     """
+    if not N8N_BEARER_TOKEN:
+        return f"Configuration error: N8N_BEARER_TOKEN is not set for {function_name}."
+    if not url:
+        return f"Configuration error: Missing webhook URL for {function_name}."
+
     headers = {
         "Authorization": f"Bearer {N8N_BEARER_TOKEN}",
         "Content-Type": "application/json"
     }
     
     try:
+        timeout = (5, 20)
         if method == "GET":
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=timeout)
         elif method == "POST":
-            response = requests.post(url, headers=headers, json=payload)
+            response = requests.post(url, headers=headers, json=payload, timeout=timeout)
         else:
             return f"Unsupported method: {method}"
 
         response.raise_for_status()
-        return json.dumps(response.json(), indent=2)
-    except Exception as e:
-        return f"Exception when calling {function_name}: {e}" 
+        try:
+            return json.dumps(response.json(), indent=2)
+        except ValueError:
+            return response.text
+    except requests.exceptions.Timeout:
+        return f"Timeout when calling {function_name}."
+    except requests.exceptions.RequestException as e:
+        return f"HTTP error when calling {function_name}: {e}"
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
