@@ -123,8 +123,17 @@ def prompt_ai(messages, nested_calls=0, invoked_tools=[]):
 
     try:
         ai_response = asana_chatbot.invoke(messages)
-    except:
-        return prompt_ai(messages, nested_calls + 1)
+    except Exception as e:
+        print(f"Error invoking AI model (attempt {nested_calls + 1}): {str(e)}")
+        # Log the specific error for debugging
+        if nested_calls < 3:
+            return prompt_ai(messages, nested_calls + 1)
+        else:
+            # If we've exceeded retry attempts, return a user-friendly error
+            return {
+                "tool_calls": [],
+                "content": "I'm sorry, I'm having trouble processing your request right now. Please try again later."
+            }
     print(ai_response)
 
     # Second, see if the AI decided it needs to invoke a tool
@@ -134,11 +143,20 @@ def prompt_ai(messages, nested_calls=0, invoked_tools=[]):
         for tool_call in ai_response["tool_calls"]:
             if str(tool_call) not in invoked_tools:
                 tool_name = tool_call["name"].lower()
-                selected_tool = available_tools[tool_name]
-                tool_output = selected_tool(**tool_call["args"])
-
-                messages.append(AIMessage(content=f"Thought: - I called {tool_name} with args {tool_call['args']} and got back: {tool_output}."))  
-                invoked_tools.append(str(tool_call))  
+                if tool_name not in available_tools:
+                    error_msg = f"Unknown tool: {tool_name}. Available tools: {list(available_tools.keys())}"
+                    messages.append(AIMessage(content=f"Thought: - Error: {error_msg}"))
+                    continue
+                
+                try:
+                    selected_tool = available_tools[tool_name]
+                    tool_output = selected_tool(**tool_call["args"])
+                    messages.append(AIMessage(content=f"Thought: - I called {tool_name} with args {tool_call['args']} and got back: {tool_output}."))  
+                    invoked_tools.append(str(tool_call))
+                except Exception as e:
+                    error_msg = f"Error executing tool {tool_name}: {str(e)}"
+                    print(error_msg)
+                    messages.append(AIMessage(content=f"Thought: - {error_msg}"))
             else:
                 return ai_response          
 

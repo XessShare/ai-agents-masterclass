@@ -1,15 +1,24 @@
 import streamlit as st
 import requests
 import uuid
+import os
+from dotenv import load_dotenv
 
-# Constants
-WEBHOOK_URL = "YOUR_N8N_WEBHOOK_URL_HERE"
-BEARER_TOKEN = "YOUR_BEARER_TOKEN_HERE"
+# Load environment variables
+load_dotenv()
+
+# Constants - Load from environment variables for security
+WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
+BEARER_TOKEN = os.getenv("N8N_BEARER_TOKEN", "")
 
 def generate_session_id():
     return str(uuid.uuid4())
 
 def send_message_to_llm(session_id, message):
+    # Validate that required environment variables are set
+    if not WEBHOOK_URL or not BEARER_TOKEN:
+        return "Error: Missing required environment variables. Please set N8N_WEBHOOK_URL and N8N_BEARER_TOKEN."
+    
     headers = {
         "Authorization": f"Bearer {BEARER_TOKEN}",
         "Content-Type": "application/json"
@@ -18,11 +27,15 @@ def send_message_to_llm(session_id, message):
         "sessionId": session_id,
         "chatInput": message
     }
-    response = requests.post(WEBHOOK_URL, json=payload, headers=headers)
-    if response.status_code == 200:
-        return response.json()["output"]
-    else:
-        return f"Error: {response.status_code} - {response.text}"
+    
+    try:
+        response = requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=30)
+        if response.status_code == 200:
+            return response.json().get("output", "No output received")
+        else:
+            return f"Error: {response.status_code} - {response.text}"
+    except requests.exceptions.RequestException as e:
+        return f"Network error: {str(e)}"
 
 def main():
     st.title("Chat with LLM")
